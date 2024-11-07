@@ -20,19 +20,15 @@ longTermEMA = ta.ema(close, longTermLength)
 // Calculate ATR
 atr = ta.atr(atrPeriod)
 
-// Define Trend Direction
-bullishTrend = close > longTermEMA
-bearishTrend = close < longTermEMA
-
-// Buy/Sell Conditions with Trend Filter and alternating signals
+// Alternating Buy/Sell Signal Logic
 var bool lastSignalWasBuy = false
-buySignal = ta.crossover(fastEMA, slowEMA) and bullishTrend and not lastSignalWasBuy
-sellSignal = ta.crossunder(fastEMA, slowEMA) and bearishTrend and lastSignalWasBuy
+buySignal = ta.crossover(fastEMA, slowEMA) and not lastSignalWasBuy
+sellSignal = ta.crossunder(fastEMA, slowEMA) and lastSignalWasBuy
 
-// Update the last signal status
-if buySignal
+// Update the last signal to prevent consecutive buy/sell
+if (buySignal)
     lastSignalWasBuy := true
-if sellSignal
+if (sellSignal)
     lastSignalWasBuy := false
 
 // Plot Buy/Sell Signals on the Chart
@@ -49,14 +45,14 @@ var float entryPrice = na
 var line slLine = na
 var line tpLine = na
 
-if buySignal
+if (buySignal)
     entryPrice := close
     sl = entryPrice - (atr * atrMultiplier)
     tp = entryPrice + (atr * atrMultiplier * 2)
     slLine := line.new(bar_index, sl, bar_index + 10, sl, color=color.red, style=line.style_dashed)
     tpLine := line.new(bar_index, tp, bar_index + 10, tp, color=color.green, style=line.style_dashed)
 
-if sellSignal
+if (sellSignal)
     entryPrice := close
     sl = entryPrice + (atr * atrMultiplier)
     tp = entryPrice - (atr * atrMultiplier * 2)
@@ -64,5 +60,5 @@ if sellSignal
     tpLine := line.new(bar_index, tp, bar_index + 10, tp, color=color.green, style=line.style_dashed)
 
 // Alert Conditions for Notifications
-alertcondition(buySignal, title="Buy Alert", message="Enhanced SmartTrend Trader: BUY Signal")
-alertcondition(sellSignal, title="Sell Alert", message="Enhanced SmartTrend Trader: SELL Signal")
+alertcondition(buySignal, title="Buy Alert", message="SmartTrend Trader: BUY Signal")
+alertcondition(sellSignal, title="Sell Alert", message="SmartTrend Trader: SELL Signal")
