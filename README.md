@@ -14,4 +14,6 @@ Benefits
 ***Ideal Use Case***
 The SmartTrend Trader is perfect for traders seeking a trend-following system with advanced risk management. It is particularly effective for those aiming to improve trade accuracy and reliability by confirming entries and exits with multiple indicators and conditions.
 
+https://www.tradingview.com/script/jIwurkR8-SmartTrend-Trader/
+
 ***Note: ***This strategy prioritizes trades in line with the primary trend and is equipped with robust filters to improve overall trade quality.
