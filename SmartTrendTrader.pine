@@ -1,96 +1,68 @@
-// This work is licensed under a Attribution-NonCommercial-ShareAlike 4.0 International (CC BY-NC-SA 4.0) https://creativecommons.org/licenses/by-nc-sa/4.0/
-// © LuxAlgo
-
 //@version=5
-indicator("Trendlines with Breaks [LuxAlgo]", "LuxAlgo - Trendlines with Breaks", overlay = true)
-//------------------------------------------------------------------------------
-//Settings
-//-----------------------------------------------------------------------------{
-length = input.int(14, 'Swing Detection Lookback')
-mult = input.float(1., 'Slope', minval = 0, step = .1)
-calcMethod = input.string('Atr', 'Slope Calculation Method', options = ['Atr','Stdev','Linreg'])
-backpaint = input(true, tooltip = 'Backpainting offset displayed elements in the past. Disable backpainting to see real time information returned by the indicator.')
+// Author: Krishneil
 
-//Style
-upCss = input.color(color.teal, 'Up Trendline Color', group = 'Style')
-dnCss = input.color(color.red, 'Down Trendline Color', group = 'Style')
-showExt = input(true, 'Show Extended Lines')
+indicator("SmartTrend Trader", overlay=true)
 
-//-----------------------------------------------------------------------------}
-//Calculations
-//-----------------------------------------------------------------------------{
-var upper = 0.
-var lower = 0.
-var slope_ph = 0.
-var slope_pl = 0.
+// Parameters for Moving Averages
+fastLength = input.int(9, title="Fast EMA Length", minval=1)
+slowLength = input.int(21, title="Slow EMA Length", minval=1)
+longTermLength = input.int(200, title="Long-Term EMA Length", minval=1)
 
-var offset = backpaint ? length : 0
+// Parameters for ATR
+atrPeriod = input.int(14, title="ATR Period", minval=1)
+atrMultiplier = input.float(1.5, title="ATR Multiplier for Stop Loss/Take Profit", minval=0.1)
 
-n = bar_index
-src = close
+// Calculate Moving Averages
+fastEMA = ta.ema(close, fastLength)
+slowEMA = ta.ema(close, slowLength)
+longTermEMA = ta.ema(close, longTermLength)
 
-ph = ta.pivothigh(length, length)
-pl = ta.pivotlow(length, length)
+// Calculate ATR
+atr = ta.atr(atrPeriod)
 
-//Slope Calculation Method
-slope = switch calcMethod
-    'Atr'    => ta.atr(length) / length * mult
-    'Stdev'  => ta.stdev(src,length) / length * mult
-    'Linreg' => math.abs(ta.sma(src * n, length) - ta.sma(src, length) * ta.sma(n, length)) / ta.variance(n, length) / 2 * mult
+// Define Trend Direction
+bullishTrend = close > longTermEMA
+bearishTrend = close < longTermEMA
 
-//Get slopes and calculate trendlines
-slope_ph := ph ? slope : slope_ph
-slope_pl := pl ? slope : slope_pl
+// Buy/Sell Conditions with Trend Filter and alternating signals
+var bool lastSignalWasBuy = false
+buySignal = ta.crossover(fastEMA, slowEMA) and bullishTrend and not lastSignalWasBuy
+sellSignal = ta.crossunder(fastEMA, slowEMA) and bearishTrend and lastSignalWasBuy
 
-upper := ph ? ph : upper - slope_ph
-lower := pl ? pl : lower + slope_pl
+// Update the last signal status
+if buySignal
+    lastSignalWasBuy := true
+if sellSignal
+    lastSignalWasBuy := false
 
-var upos = 0
-var dnos = 0
-upos := ph ? 0 : close > upper - slope_ph * length ? 1 : upos
-dnos := pl ? 0 : close < lower + slope_pl * length ? 1 : dnos
+// Plot Buy/Sell Signals on the Chart
+plotshape(buySignal, title="BUY Signal", location=location.belowbar, color=color.lime, style=shape.labelup, text="BUY", textcolor=color.white, size=size.large)
+plotshape(sellSignal, title="SELL Signal", location=location.abovebar, color=color.red, style=shape.labeldown, text="SELL", textcolor=color.white, size=size.large)
 
-//-----------------------------------------------------------------------------}
-//Extended Lines
-//-----------------------------------------------------------------------------{
-var uptl  = line.new(na,na,na,na, color = upCss, style = line.style_dashed, extend = extend.right)
-var dntl  = line.new(na,na,na,na, color = dnCss, style = line.style_dashed, extend = extend.right)
+// Plot the EMAs for trend visibility
+plot(fastEMA, color=color.blue, title="Fast EMA")
+plot(slowEMA, color=color.orange, title="Slow EMA")
+plot(longTermEMA, color=color.purple, title="Long-Term EMA")
 
-if ph and showExt
-    uptl.set_xy1(n-offset, backpaint ? ph : upper - slope_ph * length)
-    uptl.set_xy2(n-offset+1, backpaint ? ph - slope : upper - slope_ph * (length+1))
+// Plot Stop Loss and Take Profit Levels
+var float entryPrice = na
+var line slLine = na
+var line tpLine = na
 
-if pl and showExt
-    dntl.set_xy1(n-offset, backpaint ? pl : lower + slope_pl * length)
-    dntl.set_xy2(n-offset+1, backpaint ? pl + slope : lower + slope_pl * (length+1))
+if buySignal
+    entryPrice := close
+    sl = entryPrice - (atr * atrMultiplier)
+    tp = entryPrice + (atr * atrMultiplier * 2)
+    slLine := line.new(bar_index, sl, bar_index + 10, sl, color=color.red, style=line.style_dashed)
+    tpLine := line.new(bar_index, tp, bar_index + 10, tp, color=color.green, style=line.style_dashed)
 
-//-----------------------------------------------------------------------------}
-//Plots
-//-----------------------------------------------------------------------------{
-plot(backpaint ? upper : upper - slope_ph * length, 'Upper', color = ph ? na : upCss, offset = -offset)
-plot(backpaint ? lower : lower + slope_pl * length, 'Lower', color = pl ? na : dnCss, offset = -offset)
+if sellSignal
+    entryPrice := close
+    sl = entryPrice + (atr * atrMultiplier)
+    tp = entryPrice - (atr * atrMultiplier * 2)
+    slLine := line.new(bar_index, sl, bar_index + 10, sl, color=color.red, style=line.style_dashed)
+    tpLine := line.new(bar_index, tp, bar_index + 10, tp, color=color.green, style=line.style_dashed)
 
-//Breakouts
-plotshape(upos > upos[1] ? low : na, "Upper Break"
-  , shape.labelup
-  , location.absolute
-  , upCss
-  , text = "B"
-  , textcolor = color.white
-  , size = size.tiny)
-
-plotshape(dnos > dnos[1] ? high : na, "Lower Break"
-  , shape.labeldown
-  , location.absolute
-  , dnCss
-  , text = "B"
-  , textcolor = color.white
-  , size = size.tiny)
-
-//-----------------------------------------------------------------------------}
-//Alerts
-//-----------------------------------------------------------------------------{
-alertcondition(upos > upos[1], 'Upward Breakout', 'Price broke the down-trendline upward')
-alertcondition(dnos > dnos[1], 'Downward Breakout', 'Price broke the up-trendline downward')
-
-//-----------------------------------------------------------------------------}
+// Alert Conditions for Notifications
+alertcondition(buySignal, title="Buy Alert", message="Enhanced SmartTrend Trader: BUY Signal")
+alertcondition(sellSignal, title="Sell Alert", message="Enhanced SmartTrend Trader: SELL Signal")
