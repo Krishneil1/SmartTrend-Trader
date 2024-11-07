@@ -1,0 +1,2 @@
+# SmartTrend-Trader
+SmartTrend Trader
