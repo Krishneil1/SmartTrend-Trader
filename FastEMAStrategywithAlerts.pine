@@ -1,0 +1,42 @@
+//@version=5
+strategy("Fast EMA Strategy with Alerts", overlay=true, default_qty_type=strategy.percent_of_equity, default_qty_value=100)
+
+// Inputs
+fastEMALength = input.int(9, title="Fast EMA Length", minval=1)
+cooldownBars = input.int(5, title="Cooldown Period (Bars)", minval=1)  // Minimum bars between consecutive signals
+
+// Calculate Fast EMA
+fastEMA = ta.ema(close, fastEMALength)
+
+// Detect EMA Slope
+emaSlope = fastEMA - fastEMA[1]
+isIncreasing = emaSlope > 0
+isDecreasing = emaSlope < 0
+
+// Track Last Signal Bar Index and Type
+var int lastSignalBarIndex = na
+var bool lastSignalWasBuy = false
+
+// Buy and Sell Conditions
+buyCondition = isIncreasing and not lastSignalWasBuy and (na(lastSignalBarIndex) or bar_index - lastSignalBarIndex > cooldownBars)
+sellCondition = isDecreasing and lastSignalWasBuy and (na(lastSignalBarIndex) or bar_index - lastSignalBarIndex > cooldownBars)
+
+// Execute Buy and Sell Orders
+if (buyCondition)
+    strategy.entry("BUY", strategy.long)  // Entry for buy
+    label.new(bar_index, low, text="BUY", style=label.style_label_up, color=color.green, textcolor=color.white)
+    lastSignalWasBuy := true
+    lastSignalBarIndex := bar_index
+
+if (sellCondition)
+    strategy.close("BUY")  // Close buy position on sell condition
+    label.new(bar_index, high, text="SELL", style=label.style_label_down, color=color.red, textcolor=color.white)
+    lastSignalWasBuy := false
+    lastSignalBarIndex := bar_index
+
+// Define Alerts for Buy and Sell
+alertcondition(buyCondition, title="Buy Alert", message="Buy Alert: Fast EMA is increasing, buy signal triggered!")
+alertcondition(sellCondition, title="Sell Alert", message="Sell Alert: Fast EMA is decreasing, sell signal triggered!")
+
+// Plot Fast EMA
+plot(fastEMA, color=color.blue, title="Fast EMA")
